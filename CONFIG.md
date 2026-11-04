@@ -39,17 +39,28 @@ DSH 设置 → 「桌宠配置」：
 
 用户层配置文件位于 `$DSH_HOME/dsh-pet/main-config.jsonc`。**它和包内默认配置是同一套格式**——想改什么直接照着 `assets/config.jsonc` 的结构写即可，写错的字段/缺失的字段回落默认，无需（也无法）写完整份。设置页「同步」可直接生成这份完整文件（原文复制包内 `config.jsonc`，注释齐全）：
 
-| 字段                   | 作用                                                                                                           | 格式与默认一致即可         |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `pets`                 | 宠物列表（大小/位置/多开/余额开关）                                                                            | 数组，每项同 `pets[]` 结构 |
-| `animations`           | **动画池**：idle / turn / drag / clicks / moves / categories / events（余额等事件动画）/ sleep（睡觉套，可选） | 同 `animations` 结构       |
-| `animationWeights`     | 动画链播放权重（idle / turn / move）                                                                           | 同 `animationWeights` 结构 |
-| `eventsRefreshSec`     | 事件刷新周期（秒）：`whisper` 碎碎念、`sleepTalk` 梦话、`balance` 余额                                         | 同 `eventsRefreshSec` 结构 |
-| `sleepStartTexts`      | **入睡台词**（条目级，随机挑一句；播「开始」时弹气泡）                                                         | 非空字符串数组             |
-| `sleepEndTexts`        | **醒来台词**（条目级，随机挑一句；播「起来」时弹气泡）                                                         | 非空字符串数组             |
-| `sleepRefuseTexts`     | **睡着被打扰时的拒绝台词**（条目级，随机挑一句）                                                               | 非空字符串数组             |
-| `notificationsEnabled` | 系统通知总开关（布尔）                                                                                         | 同 `notificationsEnabled`  |
+| 字段                   | 作用                                                                                                                       | 格式与默认一致即可         |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `pets`                 | 宠物列表（大小/位置/多开/余额开关）                                                                                        | 数组，每项同 `pets[]` 结构 |
+| `animations`           | **动画池**：idle / turn / drag / clicks / moves / categories / events（余额等事件动画）/ sleep（睡觉套，可选）             | 同 `animations` 结构       |
+| `animationWeights`     | 动画链播放权重（idle / turn / move）                                                                                       | 同 `animationWeights` 结构 |
+| `eventsRefreshSec`     | 事件刷新周期（秒）：`whisper` 碎碎念、`sleepTalk` 梦话、`balance` 余额                                                     | 同 `eventsRefreshSec` 结构 |
+| `sleepStartTexts`      | **入睡台词**（条目级，随机挑一句；播「开始」时弹气泡）                                                                     | 非空字符串数组             |
+| `sleepEndTexts`        | **醒来台词**（条目级，随机挑一句；播「起来」时弹气泡）                                                                     | 非空字符串数组             |
+| `sleepRefuseTexts`     | **睡着被打扰时的拒绝台词**（条目级，随机挑一句）                                                                           | 非空字符串数组             |
+| `notificationsEnabled` | 系统通知总开关（布尔）                                                                                                     | 同 `notificationsEnabled`  |
 | `chatAnimationEnabled` | **对话动作联动**：开启后对话时把 `animations.categories` 下的动作清单交给模型，由它按语境挑一个当场表演（布尔，默认 true） | 布尔，默认即可             |
+| `factsEnabled`         | **长期事实记忆总开关**（布尔，默认 true）：开启后每轮对话结束自动提炼「关于用户的事」，下次对话注入提示词                  | 布尔                       |
+| `factsMax`             | 事实条数上限（默认 60），超出按最久未被注入的顺序淘汰                                                                      | 正整数                     |
+| `factsInjectMax`       | 每次对话最多注入几条事实到提示词（默认 25）                                                                                | 正整数                     |
+| `factsExtractEnabled`  | 是否自动提炼事实（默认 true）；关掉后只能用 `/remember` 或「桌宠记忆」面板手动记                                           | 布尔                       |
+| `proactiveEnabled`     | **主动搭话**开关（布尔，默认 false）：空闲够久时它会自己冒一句                                                             | 布尔                       |
+| `proactiveIdleMin`     | 空闲多少分钟算「很久没说话」（默认 45）                                                                                    | 正整数                     |
+| `proactivePerHour`     | 每小时最多主动开口几次（默认 2）                                                                                           | 正整数                     |
+| `proactiveQuietHours`  | 安静时段，这段时间绝不主动搭话（默认 `23:00-08:00`，支持跨午夜）                                                           | `HH:MM-HH:MM` 字符串       |
+| `hotkeys`              | `{ "chat": "l" }`：鼠标悬停在宠物身上时按哪个键打开对话（单个字母或数字）                                                  | 对象，`chat` 为单字符      |
+
+> 事实存在 `$DSH_HOME/dsh-pet/memory-facts.json`（宿主与预设共读，写盘为 tmp+rename 原子替换，损坏时自动改名留档）；右侧栏「桌宠记忆」标签可视化增删改。
 
 > 覆盖语义：用户层给出即**整体替换**该字段（如写了 `animations` 就用你的整份动画池，替代默认），没写的字段回落包内默认。校验在插件加载时执行——格式错误会在 DSH 控制台显式报错，不会静默运行残缺配置。
 
@@ -130,5 +141,3 @@ $DSH_HOME/dsh-pet/
 - 配置非法 / 缺少 `-animation/` 目录 / 实例 id 与主宠物冲突 → 加载时显式报错并跳过（不影响其他宠物）
 - 设置页**会列出**文件宠物（按种类分组）：改名称/大小/位置/显示方式/四个开关/实例人设后保存，写回该种类自己的配置文件——不混进 `main-config.jsonc`，文件顶层的动画池与人设原样保留；「+」可在该种类下新建实例，每种至少留一只
 - 余额档位动画按各宠物自己的 `events.balance`
-
-

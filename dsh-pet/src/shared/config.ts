@@ -46,6 +46,8 @@ export function flattenConfigPets(merged: Record<string, Record<string, unknown>
         chatImageEnabled: conf.chatImageEnabled as boolean | undefined,
         chatAnimationEnabled: conf.chatAnimationEnabled as boolean | undefined,
         chatImageLimit: conf.chatImageLimit as number | undefined,
+        // 悬停快捷键：客户端只拿到拍平后的实例（不读磁盘），按条目配置的按键必须随拍平带出
+        hotkeys: conf.hotkeys as { chat?: string } | undefined,
         assetRoot: entry,
         extra: entry !== 'main',
       });

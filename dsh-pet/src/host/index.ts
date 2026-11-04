@@ -15,6 +15,7 @@ import { registerSessionWatch } from './plugin/session-watch.ts';
 import { createDesktopHelper } from './plugin/desktop-helper.ts';
 import { createBalancePoll } from './plugin/balance-poll.ts';
 import { createChatMemory } from './plugin/chat-memory.ts';
+import { createChatFacts } from './plugin/chat-facts.ts';
 import { createSessionNotify } from './plugin/session-notify.ts';
 import { createPetLookup } from './plugin/pet-lookup.ts';
 import { createDownloadReport } from './plugin/download-report.ts';
@@ -73,8 +74,19 @@ export function apply(ctx: any): void {
     notifyActivityTimers,
     scheduleCompletionNotify,
   } = sessionNotify;
-  const chatMemory = createChatMemory({ ctx, configPaths, log, memeDirsFor, playback, state, userRoot });
-  const { lastWhisperAt, publishWhisper, publishSleepTalk, chatWithPet, getActivePetId, setActivePetId } = chatMemory;
+  // 长期事实记忆：一轮里唯一实例（路由与对话共用同一把写锁，各 new 一份会互相覆盖）
+  const facts = createChatFacts({ userRoot, log });
+  const chatMemory = createChatMemory({ ctx, configPaths, facts, log, memeDirsFor, playback, state, userRoot });
+  const {
+    lastWhisperAt,
+    publishWhisper,
+    publishProactive,
+    publishSleepTalk,
+    lastUserChatAt,
+    chatWithPet,
+    getActivePetId,
+    setActivePetId,
+  } = chatMemory;
 
   const balancePoll = createBalancePoll({ ctx, configPaths, getActivePetId, log, state, standaloneAiBalance });
   const { effectivePetList, balancePeriodSec, whisperPeriodSec, refreshBalance, resolveActivePetId, petDisplayName } =
@@ -105,6 +117,7 @@ export function apply(ctx: any): void {
     ...sessionNotify,
     ctx,
     todos,
+    facts,
     // 语音合成：缓存落 userRoot，失败只留日志，不打断宿主
     voice: createVoiceService({ userRoot, log }),
     // 语音识别：能力来自宿主（DSH 的 speechToText），没启用时服务自己在调用时回 unsupported
@@ -136,8 +149,10 @@ export function apply(ctx: any): void {
     balancePeriodSec,
     configPaths,
     lastWhisperAt,
+    lastUserChatAt,
     lock,
     log,
+    publishProactive,
     publishWhisper,
     publishSleepTalk,
     refreshBalance,

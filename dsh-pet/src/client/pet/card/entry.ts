@@ -5,7 +5,7 @@
  * @module dsh-pet/src/client/pet/card/entry
  */
 import {
-  CHAT_HOTKEY_HINT,
+  chatHotkeyHint,
   createHearHold,
   isCaptureHotkey,
   mountChatDialog,
@@ -282,6 +282,8 @@ export function createCardEntry(rt: CardEntryRuntime) {
       const offChat = bindOpenChat({
         stage: stageGetterRef.current(),
         isHovered: () => hoverRef.current,
+        // 每次按键现取配置：设置页改了 hotkeys.chat，下一次悬停按键就是新键（不必重载插件）
+        hotkey: () => cfgRef.current.hotkeys?.chat,
         openChat: (image) => (image === undefined ? openChatRef.current() : openChatWithImageRef.current(image)),
       });
       // 按住 M：按下开录、松手收尾。状态机自己管自动重复与松开，这里只管把事件送进去。
@@ -357,7 +359,7 @@ export function createCardEntry(rt: CardEntryRuntime) {
         { label: '查看余额', action: 'show-balance' },
         { label: '待办事项', action: 'todo', hint: TODO_HOTKEY_HINT },
         { label: '碎碎念', action: 'whisper' },
-        { label: '对话', action: 'chat', hint: CHAT_HOTKEY_HINT },
+        { label: '对话', action: 'chat', hint: chatHotkeyHint(pic.hotkeys?.chat) },
         ...(memes ? [memes] : []),
         ...(canSleep ? [sleepItem] : []),
       ];

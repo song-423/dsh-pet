@@ -10,7 +10,16 @@ export type { EncodedImage } from './encode.ts';
 export type { HearHold, HearHoldHooks } from './hear-hold.ts';
 export { createHearHold, isHearHotkey } from './hear-hold.ts';
 export { dragHasFiles, firstImageFile, firstImageFromClipboard, isImageFile } from './image-pick.ts';
-export { CAPTURE_HOTKEY_HINT, CHAT_HOTKEY_HINT, isCaptureHotkey, isChatHotkey, isTypingTarget } from './hotkey.ts';
+export {
+  CAPTURE_HOTKEY_HINT,
+  CHAT_HOTKEY_HINT,
+  DEFAULT_CHAT_HOTKEY,
+  chatHotkeyHint,
+  isCaptureHotkey,
+  isChatHotkey,
+  isTypingTarget,
+  normalizeChatHotkey,
+} from './hotkey.ts';
 export type { ChatSendState, ChatAttachment } from './send.ts';
 export { sendChat } from './send.ts';
 export { CHAT_CSS } from './styles.ts';

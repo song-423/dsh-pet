@@ -43,6 +43,8 @@ export interface MainConfigPatch {
   chatModel?: ModelSelection;
   chatMemoryRounds?: number;
   chatImageLimit?: number;
+  /** 悬停打开对话的按键（单字符）；缺省表示这次响应里没有可信值，卡片按默认 L 显示。 */
+  hotkeys?: { chat?: string };
 }
 
 /** 非负有限数才算合法；其余（`NaN`、负数、字符串）一律当作没写。 */
@@ -101,6 +103,11 @@ export function readMainConfig(merged: MergedConfig): MainConfigPatch | null {
   // 上界在宿主侧已经把关，这里补一次跨进程读回的判定：脏值只影响显示，不让它流到播放端
   const volume = nonNegative(main.voiceVolume);
   if (volume !== undefined && volume <= 1) patch.voiceVolume = volume;
+  // 悬停键：只认单字符（宿主已按同一规则校验），其余一律当作没写，让卡片保留默认 L
+  const hotkeys = main.hotkeys as { chat?: unknown } | undefined;
+  if (hotkeys && typeof hotkeys.chat === 'string' && /^[A-Za-z0-9]$/.test(hotkeys.chat)) {
+    patch.hotkeys = { chat: hotkeys.chat };
+  }
   return patch;
 }
 

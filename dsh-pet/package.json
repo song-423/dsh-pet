@@ -28,6 +28,7 @@
     "main: lib/index.js —— 宿主半侧入口（Cordis 插件：name/inject/apply）",
     "icon —— 插件图标（DSH 插件管理页显示）：相对 package.json 的图片路径，只认 svg/png/jpg/jpeg/webp，≤256 KiB，realpath 后必须留在包目录内；读取方是 dsh-app-boot 的 iconOf，会内联成 base64 data URL 塞进 meta.icon",
     "exports['./client'] —— 浏览器半侧入口，DSH 模块系统按它提供 /plugins/dsh-pet/client.js",
+    "exports['./preset'] —— 预设半侧入口（lib/preset.js）：cordis.patch.yml 里 preset-pet 行的 plugins 用 'dsh-pet/preset' 引用，把桌宠人格与只读工具集装成 DSH 的一个预设",
     "dsh.bundle.patch —— 声明本包是 bundle，patch 文件是 cordis.patch.yml（安装后自动进层栈）",
     "dsh.client —— 声明浏览器半侧的注入依赖和平台（web）",
     "dsh.compatibility.dshReleases —— 对官方 DSH 完整版本逐项声明 compatible/incompatible/unknown；只写宽泛范围不算证据，商城最新三版至少需要一个 compatible。列表只保最新三版，新增一版就删最旧一版：DSH 自己只按 engines.dsh 与 peerDependencies 判定能不能装，这份列表不进安装闸门，无限叠加只会变成维护负担",
@@ -53,6 +54,9 @@
     "./client": {
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
+    },
+    "./preset": {
+      "default": "./lib/preset.js"
     },
     "./src/*": "./src/*",
     "./cordis.patch.yml": "./cordis.patch.yml",

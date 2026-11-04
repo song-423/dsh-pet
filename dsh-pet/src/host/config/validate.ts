@@ -207,6 +207,44 @@ export function topFieldValid(key: string, value: unknown): boolean {
       return modelSelectionValid(value);
     case 'workStatusTexts':
       return workStatusTextsValid(value);
+    case 'factsEnabled':
+      // 事实记忆总开关（条目级布尔）：关掉后不提炼也不注入
+      return typeof value === 'boolean';
+    case 'factsExtractEnabled':
+      // 自动提炼开关（条目级布尔）：关掉后只能手动加事实
+      return typeof value === 'boolean';
+    case 'factsMax': {
+      // 事实条数上限：正整数（0 / 负数没有意义，读取侧会回落 60）
+      const n = Number(value);
+      return Number.isFinite(n) && n > 0;
+    }
+    case 'factsInjectMax': {
+      // 每次注入条数：0 也是合法的（= 只存不注入），故允许 0
+      const n = Number(value);
+      return Number.isFinite(n) && n >= 0;
+    }
+    case 'proactiveEnabled':
+      // 主动搭话开关（条目级布尔）
+      return typeof value === 'boolean';
+    case 'proactiveIdleMin': {
+      // 空闲阈值（分钟）：正有限数
+      const n = Number(value);
+      return Number.isFinite(n) && n > 0;
+    }
+    case 'proactivePerHour': {
+      // 每小时上限：正的有限数（小数按读取侧 floor）
+      const n = Number(value);
+      return Number.isFinite(n) && n > 0;
+    }
+    case 'proactiveQuietHours':
+      // 安静时段 `HH:MM-HH:MM` / `HH-HH`：解析交给消费端（proactive.ts），这里只卡形状
+      return typeof value === 'string' && /^\s*\d{1,2}(:\d{2})?\s*[-~至到]\s*\d{1,2}(:\d{2})?\s*$/.test(value);
+    case 'hotkeys': {
+      // 悬停快捷键表：只认 chat 一个键，值是单个字母/数字（裸键语义，见 shared/hotkey.ts）
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+      const chat = (value as Record<string, unknown>).chat;
+      return chat === undefined || (typeof chat === 'string' && /^[A-Za-z0-9]$/.test(chat));
+    }
     case 'sleepRefuseTexts':
     case 'sleepStartTexts':
     case 'sleepEndTexts': {

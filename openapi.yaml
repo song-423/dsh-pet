@@ -1820,6 +1820,172 @@ paths:
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
 
+  /dsh-pet-7340/memory/facts:
+    get:
+      tags: ["Action"]
+      operationId: listPetFacts
+      summary: 列出桌宠记住的事实
+      description: |
+        `memory-facts.json` 里某只宠物的**事实清单**（从对话里提炼、长期保留的那些「关于用户的事」）。
+
+        与 `memory.json` 的分工：`/chat` 管「说过的话」（只截尾部若干轮进上下文），
+        这里管「记住的事」（按注入上限进上下文、可手动增删改）。两份数据分开，所以
+        「清空对话」不会误伤记忆。
+
+        `max` 是该条目的条数上限（`factsMax`，缺省 60）：超出时按「最久没被用到」先淘汰。
+      parameters:
+        - $ref: "#/components/parameters/PetIdQuery"
+      responses:
+        "200":
+          description: |
+            恒为 200。成功 `{ ok: true, facts, max }`；
+            缺 `pet` / 宠物不存在是 `{ ok: false, reason: 'pet-required' | 'unknown-pet', ... }`。
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [ok, facts, max]
+                    properties:
+                      ok:
+                        type: boolean
+                        const: true
+                      facts:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Fact"
+                      max:
+                        type: integer
+                        description: 该条目的条数上限（`factsMax`，缺省 60）
+                  - $ref: "#/components/schemas/FailureResponse"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+    post:
+      tags: ["Action"]
+      operationId: addPetFacts
+      summary: 手动加一条（或一批）事实
+      description: |
+        `text`（单条）或 `texts`（数组，两者都给时以 `texts` 为准）；单次最多 20 条、每条最多 200 字。
+        归一化后再落盘：压空白、剥列表符号、按去重（同文本只留一条）。
+      parameters:
+        - $ref: "#/components/parameters/PetIdQuery"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  description: 单条事实正文
+                texts:
+                  type: array
+                  items:
+                    type: string
+                  description: 批量（优先级高于 `text`）
+      responses:
+        "200":
+          description: |
+            成功 `{ ok: true, added, facts }`（`added` 是实际新增的那些，重复的不会出现）；
+            内容是空 / 过长 / 条数超限是 `{ ok: false, reason: 'bad-request' }`。
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [ok, added, facts]
+                    properties:
+                      ok:
+                        type: boolean
+                        const: true
+                      added:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Fact"
+                      facts:
+                        type: array
+                        description: 写入后的完整清单
+                        items:
+                          $ref: "#/components/schemas/Fact"
+                  - $ref: "#/components/schemas/FailureResponse"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+    patch:
+      tags: ["Action"]
+      operationId: updatePetFact
+      summary: 改一条事实的正文
+      description: 按 `id` 定位、用 `text` 覆盖正文；找不到那条 id 回 `bad-request`。
+      parameters:
+        - $ref: "#/components/parameters/PetIdQuery"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, text]
+              properties:
+                id:
+                  type: string
+                  description: 事实 id（`GET /memory/facts` 返回的 `facts[].id`）
+                text:
+                  type: string
+                  description: 新正文（最多 200 字）
+      responses:
+        "200":
+          description: "成功 `{ ok: true, facts }`（改完的完整清单）；失败是 `{ ok: false, reason: 'bad-request' }`。"
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [ok, facts]
+                    properties:
+                      ok:
+                        type: boolean
+                        const: true
+                      facts:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Fact"
+                  - $ref: "#/components/schemas/FailureResponse"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+    delete:
+      tags: ["Action"]
+      operationId: deletePetFacts
+      summary: 删几条事实（或清空）
+      description: |
+        `?id=` 可重复，只删命中的那几条；**不传 id = 清空这只宠物的全部事实**。
+        返回 `{ ok: true, removed }`（实际删掉的条数，没命中时为 0）。
+      parameters:
+        - $ref: "#/components/parameters/PetIdQuery"
+        - name: id
+          in: query
+          required: false
+          description: 要删的事实 id，可重复；不传表示清空
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "成功 `{ ok: true, removed }`。"
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [ok, removed]
+                    properties:
+                      ok:
+                        type: boolean
+                        const: true
+                      removed:
+                        type: integer
+                  - $ref: "#/components/schemas/FailureResponse"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+
   /dsh-pet-7340/config:
     get:
       tags: [Config]
@@ -3242,6 +3408,30 @@ components:
         生成成功。文本**仍然**照旧写进 `pets.<id>.say`——其它消费端（网页、桌面、第三方监听）
         继续从 `/state` 读；返回值只是让发起的这一方省一次往返，不改变任何现有展示链路。
 
+    Fact:
+      type: object
+      required: [id, text, ts, usedAt, source]
+      properties:
+        id:
+          type: string
+          description: 稳定 id（改正文 / 删除时用它定位）
+        text:
+          type: string
+          description: 事实正文（已归一化，最多 200 字）
+        ts:
+          type: integer
+          format: int64
+          description: 写入时刻（毫秒）
+        usedAt:
+          type: integer
+          format: int64
+          description: 最近一次被注入上下文的时刻（毫秒）；淘汰按它排，越久没用到越先走
+        source:
+          type: string
+          enum: [auto, manual, command]
+          description: |
+            来源：`auto` = 对话后自动提炼，`manual` = 记忆面板手动添加，`command` = 会话里的 `/remember`。
+      description: 一条长期事实记忆（`$DSH_HOME/dsh-pet/memory-facts.json`）。
     FailureResponse:
       type: object
       required: [ok, reason]

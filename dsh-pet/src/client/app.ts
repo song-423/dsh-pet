@@ -15,6 +15,7 @@ import { initNotify } from './notify.ts';
 import { installCommandFaces, type CommandFace, type CommandUiLike } from './command-faces.ts';
 import { installSectionNavIcon } from './nav-icon.ts';
 import { registerPetChatTab, openPetChatTab } from './chat/register.ts';
+import { registerPetMemoryTab } from './memory/register.ts';
 import { PET_CHAT_COMMAND_ID, registerPetChatShortcut } from './chat/shortcut.ts';
 import { registerPetCardShortcuts } from './pet/card/shortcut.ts';
 import type * as ReactNS from 'react';
@@ -231,6 +232,17 @@ export function makeFactory(): (require: (mod: string) => any) => any {
           return () => {};
         }
       }, 'dsh-pet: sidebar chat tab');
+
+      // 右侧栏「桌宠记忆」：与对话标签并列的第二个标签，同样整段兜底——
+      // 它出了任何问题都不该把对话标签或宠物本体一起带走。
+      ctx.effect(() => {
+        try {
+          return registerPetMemoryTab(ctx, { h, useEffect, useRef, useState });
+        } catch (error) {
+          console.error('[dsh-pet] 右侧栏记忆面板注册失败（已忽略，不影响启动）：', error);
+          return () => {};
+        }
+      }, 'dsh-pet: sidebar memory tab');
     }
 
     module.exports = { apply, inject, name };

@@ -59,6 +59,15 @@ export default defineConfig([
   },
   {
     ...shared,
+    // 预设半侧（lib/preset.js）：由 DSH 的 Loader 按 `dsh-pet/preset` 解析后 import，
+    // 与宿主那一份同为 ESM、同为 @deepseek-ai/* 外部化（那些服务由宿主的预设作用域提供）。
+    entry: {
+      preset: 'src/preset/index.ts',
+    },
+    external: [/^@deepseek-ai\//, /^@electron\//, /^node:/],
+  },
+  {
+    ...shared,
     // 独立模式只在 Node ≥ 22.12 上运行（package.json 的 engines 已声明），因此目标可以是 es2022：
     // es2020 目标会把 class field 一类语法降级成 `_defineProperty(...)`，进而把
     // `@oxc-project/runtime` 拖成一条裸 import —— 那个包不在本包依赖里，装好的用户跑起来会

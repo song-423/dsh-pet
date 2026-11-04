@@ -6,7 +6,7 @@
  * @module dsh-pet/src/host/plugin/chat-memory
  */
 import { join } from 'node:path';
-import { generateChat, type ChatMemoryMessage } from '../chat.ts';
+import { generateChat, PROACTIVE_USER_TEXT, type ChatMemoryMessage } from '../chat.ts';
 import { chatActionNames } from '../chat-action.ts';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { composeSystemPrompt, petPersona } from '../persona.ts';
@@ -18,6 +18,8 @@ import { createMemoryOrphans } from './memory-orphans.ts';
 import { configuredModel } from '../model-selection.ts';
 import { SLEEP_TALK_INSTRUCTION } from '../whisper.ts';
 import { pickVoiceSurface, type VoiceTarget } from '../surface.ts';
+import type { ChatFacts } from './chat-facts.ts';
+import { extractFacts } from './fact-extract.ts';
 import type { HostSetup } from './setup.ts';
 import type { HostContext } from './context.ts';
 
@@ -35,13 +37,16 @@ export type ChatMemoryInput = {
   Pick<HostSetup, 'memeDirsFor'> &
   Pick<HostSetup, 'playback'> &
   Pick<HostSetup, 'state'> &
-  Pick<HostSetup, 'userRoot'>;
+  Pick<HostSetup, 'userRoot'> & {
+    /** 长期事实记忆（同进程唯一实例：与路由共用，各自再 new 一份会出现两把锁写同一文件）。 */
+    facts: ChatFacts;
+  };
 
 /**
  * 创建对话与记忆。
  */
 export function createChatMemory(deps: ChatMemoryInput) {
-  const { ctx, configPaths, log, memeDirsFor, playback, state, userRoot } = deps;
+  const { ctx, configPaths, facts, log, memeDirsFor, playback, state, userRoot } = deps;
   // 命令「当前桌宠」（/pet 选择、/chat 使用）：全局单值不分会话；进程内内存，重启回默认第一只
   let activePetId = '';
 
@@ -99,14 +104,34 @@ export function createChatMemory(deps: ChatMemoryInput) {
   const petSystemPrompt = (
     found: { conf: Record<string, unknown>; pet: Record<string, unknown> },
     options: { historyTimes?: boolean } = {},
+    factsText = '',
   ): string =>
     composeSystemPrompt({
       prompt: petPersona(found.conf, found.pet),
       name: String(found.pet.name ?? ''),
       id: String(found.pet.id ?? ''),
       now: new Date(),
+      ...(factsText !== '' ? { facts: factsText } : {}),
       ...(options.historyTimes === true ? { historyTimes: true } : {}),
     });
+
+  /** 该宠物当前该注入的事实段：`factsEnabled === false` 时整段关掉；
+   *  注入条数取条目级 `factsInjectMax`（缺省 25）。读不到（IO 失败）按空处理，绝不因此让对话失败。 */
+  const factsTextFor = async (found: {
+    entry: string;
+    conf: Record<string, unknown>;
+    pet: Record<string, unknown>;
+  }): Promise<string> => {
+    if (found.conf.factsEnabled === false) return '';
+    const raw = Number(found.conf.factsInjectMax);
+    const injectMax = Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 25;
+    try {
+      return await facts.render(found.entry, String(found.pet.id ?? ''), injectMax);
+    } catch (e) {
+      log.warn('[dsh-pet] 事实记忆读取失败，本次不注入：' + (e instanceof Error ? e.message : String(e)));
+      return '';
+    }
+  };
 
   /** 对话记忆轮数（1 轮 = 1 问 1 答）：该宠物所属条目的 chatMemoryRounds（合并器已填默认）。
    *  收已解析的条目配置：调用方都已拿到 `findPetInstance` 的结果。 */
@@ -147,7 +172,7 @@ export function createChatMemory(deps: ChatMemoryInput) {
     // 关掉就不写 voiceTo（叶子不带这个键 = 谁都不念），气泡照旧弹。
     const whisperVoiceOn = cfg.main?.voiceWhisperEnabled === true;
     const target = kind === 'whisper' && !whisperVoiceOn ? undefined : (voiceTo ?? voiceTargetFor(found.pet));
-    const system = petSystemPrompt(found);
+    const system = petSystemPrompt(found, {}, await factsTextFor(found));
     // 池只算一次：点名的图与随机抽图共用同一份（含文件存在性判定）。
     const pool = readMemePool(found.conf.memes, memeDirsFor(found.entry));
     // 点名了却没命中 = 配置写错或图已被删：明确失败，不静默换成另一张（点了 A 却看到 B 会以为坏了）。
@@ -196,7 +221,7 @@ export function createChatMemory(deps: ChatMemoryInput) {
     const cfg = readAllConfig(configPaths);
     const found = findPetInstance(cfg, petId);
     if (!found) return false;
-    const system = petSystemPrompt(found);
+    const system = petSystemPrompt(found, {}, await factsTextFor(found));
     const result = await generateWhisper(ctx, {
       system,
       preferred: configuredModel(found.conf, 'whisperModel'),
@@ -259,7 +284,7 @@ export function createChatMemory(deps: ChatMemoryInput) {
       const list = sliceMemoryRounds(entry.messages, rounds);
       // 人设：实例级 whisperPrompt 优先，没写回落所属条目（与碎碎念同一拼装）。
       // 有历史才追加【历史】段：没有历史时那段话在描述不存在的前缀，只会误导模型。
-      const system = petSystemPrompt(found, { historyTimes: list.length > 0 });
+      const system = petSystemPrompt(found, { historyTimes: list.length > 0 }, await factsTextFor(found));
       // 图片只记尺寸与字节数（不记 base64）：模型不支持读图时 dsh-llm 会把它投影成占位文本，靠这行日志定位
       if (image !== undefined) {
         log.info(
@@ -310,9 +335,71 @@ export function createChatMemory(deps: ChatMemoryInput) {
           ...(replyVoiceTo ? { voiceTo: replyVoiceTo } : {}),
         });
       }
+      // 事实提炼：面板对话结束后异步问一次模型「这轮有什么值得长期记住的」。
+      // 不 await、失败只留一行日志——提炼是附加价值，不能拖慢或搞坏回复。
+      if (found.conf.factsExtractEnabled !== false) {
+        const maxRaw = Number(found.conf.factsMax);
+        const factsMax = Number.isFinite(maxRaw) && maxRaw > 0 ? Math.floor(maxRaw) : 60;
+        void extractFacts({ ctx, conf: found.conf, history: list, userText: text, replyText: generated.text })
+          .then(async (texts) => (texts.length > 0 ? facts.add(found.entry, petId, texts, 'auto', factsMax) : []))
+          .then((added) => {
+            if (added.length > 0) log.info(`[dsh-pet] 事实记忆新增 ${added.length} 条 pet=${petId}`);
+          })
+          .catch((e: unknown) => log.warn('[dsh-pet] 事实提炼失败：' + (e instanceof Error ? e.message : String(e))));
+      }
       // 同一份文本随返回值带出（叶子照写，不是二选一）
       return { ok: true as const, text: generated.text, ...(generated.image ? { image: generated.image } : {}) };
     });
+
+  /** 主动搭话：没人说话时自己开一句头。与碎碎念的区别是**带上下文**——
+   *  它能看到最近几轮对话与事实记忆，所以能接上之前的话头，而不是随机说一句。
+   *  @returns 是否真的生成并写进了 S；失败（没配模型 / 生成失败）只留日志。 */
+  const publishProactive = async (petId: string): Promise<boolean> => {
+    const cfg = readAllConfig(configPaths);
+    const found = findPetInstance(cfg, petId);
+    if (!found) return false;
+    const mem = await readMemory();
+    const raw = mem[found.entry]?.[petId]?.messages;
+    // 只带最近 4 轮：主动搭话要接得上话头，不需要把整段历史重发一遍
+    const list = sliceMemoryRounds(Array.isArray(raw) ? raw : [], Math.min(4, memoryRounds(found.conf)));
+    const system = petSystemPrompt(found, {}, await factsTextFor(found));
+    const result = await generateChat({
+      ctx,
+      system,
+      history: list,
+      userText: PROACTIVE_USER_TEXT,
+      preferred: configuredModel(found.conf, 'chatModel'),
+    });
+    if (!result.ok) {
+      log.warn(
+        '[dsh-pet] 主动搭话生成失败 pet=' +
+          petId +
+          ' reason=' +
+          result.reason +
+          (result.message ? ' ' + result.message : ''),
+      );
+      return false;
+    }
+    if (result.text === '') return false;
+    state.writePet(petId, 'say', { text: result.text });
+    log.info(`[dsh-pet] 主动搭话 pet=${petId}，${result.text.length} 字`);
+    return true;
+  };
+
+  /** 某只宠物最后一次**用户**发言的时刻（毫秒）；没有历史返回 0。主动搭话用它判断「安静多久了」。 */
+  const lastUserChatAt = async (petId: string): Promise<number> => {
+    const cfg = readAllConfig(configPaths);
+    const found = findPetInstance(cfg, petId);
+    if (!found) return 0;
+    const mem = await readMemory();
+    const raw = mem[found.entry]?.[petId]?.messages;
+    if (!Array.isArray(raw)) return 0;
+    let last = 0;
+    for (const m of raw) {
+      if (m && m.role === 'user' && Number.isFinite(m.ts) && m.ts > last) last = m.ts;
+    }
+    return last;
+  };
 
   /** 删除某只宠物的对话记忆：`ts` 缺省 = 清空全部，给了 ts = 只删命中的轮（一轮两条共享 ts，成对删）。
    *  与对话共用同一条串行队列——删除不会插进一次回复的读-改-写中间，也不会被它覆盖写回。
@@ -371,6 +458,8 @@ export function createChatMemory(deps: ChatMemoryInput) {
     memoryRounds,
     publishWhisper,
     publishSleepTalk,
+    publishProactive,
+    lastUserChatAt,
     chatWithPet,
     deleteHistory,
     orphanHistory,

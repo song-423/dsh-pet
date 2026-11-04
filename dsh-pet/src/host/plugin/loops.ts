@@ -7,6 +7,7 @@
 import { findPetInstance, flattenPetList, readAllConfig } from '../config.ts';
 import { isDisplayed } from '../surface.ts';
 import { automaticWhisperSchedule } from '../whisper-policy.ts';
+import { PROACTIVE_TICK_SEC, proactiveDue, proactiveGate } from './proactive.ts';
 import type { BalancePoll } from './balance-poll.ts';
 import type { ChatMemory } from './chat-memory.ts';
 import type { PetLookup } from './pet-lookup.ts';
@@ -34,6 +35,8 @@ export type LoopsInput = {
   Pick<HostSetup, 'log'> &
   Pick<ChatMemory, 'publishWhisper'> &
   Pick<ChatMemory, 'publishSleepTalk'> &
+  Pick<ChatMemory, 'publishProactive'> &
+  Pick<ChatMemory, 'lastUserChatAt'> &
   Pick<BalancePoll, 'refreshBalance'> &
   Pick<HostSetup, 'standaloneAiPolicy'> &
   Pick<BalancePoll, 'whisperPeriodSec'>;
@@ -48,7 +51,9 @@ export function registerLoops(deps: LoopsInput): void {
     lock,
     log,
     publishWhisper,
+    publishProactive,
     publishSleepTalk,
+    lastUserChatAt,
     refreshBalance,
     sleep,
     standaloneAiPolicy,
@@ -278,6 +283,78 @@ export function registerLoops(deps: LoopsInput): void {
       if (timer !== null) clearTimeout(timer);
     };
   }, 'dsh-pet: sleep talk poll');
+
+  // 主动搭话：每 PROACTIVE_TICK_SEC 秒问一次「现在该不该开口」。判断全在 ./proactive（纯函数、可单测），
+  // 这里只维护三样时间事实：上次主动开口、最近一小时开口记录、正在生成的那一只。
+  // 与碎碎念的关键差别：它要读记忆（lastUserChatAt）才知道「安静了多久」，所以这一拍是 async。
+  ctx.effect(() => {
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    /** petId → 上一次主动开口的时刻。 */
+    const lastAt = new Map<string, number>();
+    /** petId → 最近一小时内的开口时刻（每小时上限用），每拍顺手裁掉过期的。 */
+    const recent = new Map<string, number[]>();
+    /** 正在生成的那几只：生成要几秒，别让下一拍再排一次同样的宠物。 */
+    const busy = new Set<string>();
+    function arm(): void {
+      if (disposed) return;
+      timer = setTimeout(() => void tick(), PROACTIVE_TICK_SEC * 1000);
+    }
+    async function tick(): Promise<void> {
+      try {
+        const cfg = readAllConfig(configPaths);
+        const now = Date.now();
+        const windowStart = now - 3_600_000;
+        for (const pet of flattenPetList(cfg)) {
+          const petId = String(pet.id ?? '');
+          if (!petId) continue;
+          const found = findPetInstance(cfg, petId);
+          if (!found) continue;
+          const gate = proactiveGate(found.conf);
+          // 关着的条目直接跳过，不读记忆（读盘比几个布尔值贵得多）
+          if (!gate.enabled) continue;
+          const lastUserAt = await lastUserChatAt(petId);
+          const due = proactiveDue({
+            now,
+            lastUserAt,
+            lastProactiveAt: lastAt.get(petId) ?? 0,
+            recentProactive: (recent.get(petId) ?? []).filter((t) => t > windowStart),
+            gate,
+            sleeping: sleep.sleeping(petId),
+            locked: lock.locked(petId),
+            displayed: isDisplayed(String(pet.display ?? '')),
+            busy: busy.has(petId),
+          });
+          if (!due) continue;
+          busy.add(petId);
+          lastAt.set(petId, now);
+          const list = (recent.get(petId) ?? []).filter((t) => t > windowStart);
+          list.push(now);
+          recent.set(petId, list);
+          log.info(
+            `[dsh-pet] 主动搭话触发 pet=${petId}（已安静 ${Math.max(0, Math.round((now - lastUserAt) / 60_000))} 分钟）`,
+          );
+          // 不 await：生成要几秒，别把这一拍拖住；失败原因由 publishProactive 记日志
+          void publishProactive(petId)
+            .catch(() => {})
+            .finally(() => busy.delete(petId));
+        }
+      } catch (e) {
+        // 读配置抛错 = 安装损坏：停止本循环并留一行日志（与另外三个循环同一口径）
+        log.warn(
+          '[dsh-pet] 主动搭话调度读配置失败，主动搭话已停止（重启 DSH 后恢复）：' +
+            (e instanceof Error ? e.message : String(e)),
+        );
+        return;
+      }
+      arm();
+    }
+    void tick();
+    return () => {
+      disposed = true;
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, 'dsh-pet: proactive poll');
 }
 
 /** 梦话周期（秒）：条目级 eventsRefreshSec.sleepTalk，读不到按 60 兜底（与配置注释同一口径）。 */

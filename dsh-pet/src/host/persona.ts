@@ -44,6 +44,8 @@ export interface SystemPromptParts {
   now: Date;
   /** 历史消息是否带时间前缀；缺省 false（碎碎念没有历史，不该出现【历史】段） */
   historyTimes?: boolean;
+  /** 长期事实记忆段（已渲染好的多行文本，见 ./plugin/chat-facts 的 renderFacts）；空串 = 不加 */
+  facts?: string;
 }
 
 /**
@@ -57,11 +59,13 @@ export function composeSystemPrompt(parts: SystemPromptParts): string {
   const name = String(parts.name || parts.id);
   const nameLine = name ? '你的名字是“' + name + '”。' : '';
   const lines = [parts.prompt, nameLine].filter((line) => line !== '');
+  // 事实记忆排在时间背景之后、历史说明之前：先「我是谁、现在几点、我记得什么」，最后才是
+  // 「历史消息怎么读」。facts 已是多行文本（首行是【你记得关于ta的事】），整段当一个元素拼。
+  const facts = typeof parts.facts === 'string' ? parts.facts.trim() : '';
   const time = timeContextOf(parts.now);
-  if (time) {
-    lines.push(time);
-    // 【历史】跟着时间背景走：它整句都在引用“现在”，没有时间背景时不成立
-    if (parts.historyTimes === true) lines.push(HISTORY_TIMES_LINE);
-  }
+  if (time) lines.push(time);
+  if (facts !== '') lines.push(facts);
+  // 【历史】跟着时间背景走：它整句都在引用“现在”，没有时间背景时不成立
+  if (time && parts.historyTimes === true) lines.push(HISTORY_TIMES_LINE);
   return lines.join('\n');
 }

@@ -65,6 +65,16 @@ export const GLOBAL_DEFAULT_KEYS = [
   'whisperModel',
   'chatModel',
   'eventsRefreshSec',
+  // 记忆与主动搭话：与 chatMemoryRounds 同属「节奏/成本」参数，用户层写一次对所有条目生效
+  'factsEnabled',
+  'factsMax',
+  'factsInjectMax',
+  'factsExtractEnabled',
+  'proactiveEnabled',
+  'proactiveIdleMin',
+  'proactivePerHour',
+  'proactiveQuietHours',
+  'hotkeys',
 ] as const;
 
 /** 已告警过的 文件:字段（进程内去重：同一问题只告警一次，避免每请求刷屏；重启重置） */

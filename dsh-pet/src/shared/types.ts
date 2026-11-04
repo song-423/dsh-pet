@@ -145,6 +145,9 @@ export interface Pet {
   chatAnimationEnabled?: boolean;
   /** 条目级：对话配图张数上限（非负整数，0 = 不限制）。只截「交给模型的清单」，不截碎碎念抽图。 */
   chatImageLimit?: number;
+  /** 条目级：悬停快捷键。`chat` = 鼠标停在宠物上时按哪个键打开对话输入框（单个字母/数字，缺省 L）。
+   *  只影响「悬停裸键」，与应用级组合键（Ctrl/Cmd+Shift+P 等）无关。 */
+  hotkeys?: { chat?: string };
 }
 
 /** 一处「服务商 + 模型」选择（config.jsonc 的 whisperModel / chatModel 段）。
@@ -232,4 +235,23 @@ export interface ClientConfig {
   chatModel: ModelSelection;
   /** 事件刷新周期（秒）：事件名 → 间隔；balance = 余额数据刷新与动画触发间隔 */
   eventsRefreshSec: Record<string, number>;
+  /** 长期事实记忆总开关（条目级）：true/缺省 = 对话后自动提炼事实并注入提示词；false = 完全不用事实清单。
+   *  与 chatMemoryRounds 的分工：轮数管「最近几句原文」，事实管「一直记得的事」。 */
+  factsEnabled?: boolean;
+  /** 事实条数上限（条目级，缺省 60）：超出后按「最久没被用到」淘汰 */
+  factsMax?: number;
+  /** 每次注入上下文的事实条数（条目级，缺省 25）：太小会忘事，太大白烧 token */
+  factsInjectMax?: number;
+  /** 是否在面板对话后自动提炼事实（条目级，缺省 true）：关掉后只能手动加 */
+  factsExtractEnabled?: boolean;
+  /** 主动搭话开关（条目级，缺省 false）：安静一阵子后自己开口说一句 */
+  proactiveEnabled?: boolean;
+  /** 安静多久算「可以说句话了」（分钟，缺省 45） */
+  proactiveIdleMin?: number;
+  /** 每小时最多主动开口几次（缺省 2） */
+  proactivePerHour?: number;
+  /** 安静时段（本地时间，缺省 "23:00-08:00"，支持跨午夜）：这段时间内绝不主动开口 */
+  proactiveQuietHours?: string;
+  /** 悬停快捷键（条目级）：`chat` = 鼠标悬停时按哪个键打开对话输入框（缺省 L） */
+  hotkeys?: { chat?: string };
 }

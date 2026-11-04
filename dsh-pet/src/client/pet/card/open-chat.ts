@@ -16,6 +16,8 @@ export interface OpenChatInput {
   readonly isHovered: () => boolean;
   /** 打开对话；带图时直接进入待发送状态。 */
   readonly openChat: (image?: File) => void;
+  /** 配置的对话键（每次按键现取：设置页改了键不必重挂监听）。缺省 L。 */
+  readonly hotkey?: () => unknown;
 }
 
 /**
@@ -25,9 +27,9 @@ export interface OpenChatInput {
  * @returns 解绑函数，交给调用方的 effect 清理。
  */
 export function bindOpenChat(input: OpenChatInput): () => void {
-  const { stage, isHovered, openChat } = input;
+  const { stage, isHovered, openChat, hotkey } = input;
   const onKeyDown = (e: KeyboardEvent): void => {
-    if (!isHovered() || !isChatHotkey(e)) return;
+    if (!isHovered() || !isChatHotkey(e, hotkey?.())) return;
     e.preventDefault();
     openChat();
   };

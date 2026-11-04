@@ -10,7 +10,7 @@
  */
 import type { FunctionComponent } from 'react';
 import { HEAR_HOTKEY_HINT } from '../../shared/chat/hear-hold.ts';
-import { CAPTURE_HOTKEY_HINT, CHAT_HOTKEY_HINT } from '../../shared/chat/hotkey.ts';
+import { CAPTURE_HOTKEY_HINT, chatHotkeyHint } from '../../shared/chat/hotkey.ts';
 import { DISPLAY_HOTKEY_HINTS } from '../../shared/display-hotkey.ts';
 import { SLEEP_HOTKEY_HINT } from '../../shared/sleep-hotkey.ts';
 import { TODO_HOTKEY_HINT } from '../../shared/todo/hotkey.ts';
@@ -48,6 +48,12 @@ function readKeycaps(ctx: ShortcutHost): GlobalKeycaps {
   };
 }
 
+/** 卡片入参。 */
+export interface ShortcutsCardProps {
+  /** 配置里的悬停对话键（缺省 L）；只用于显示，键位本身在 main-config.jsonc 里改。 */
+  readonly chatHotkey?: unknown;
+}
+
 /**
  * 造快捷键卡。
  *
@@ -55,11 +61,11 @@ function readKeycaps(ctx: ShortcutHost): GlobalKeycaps {
  * @param ctx - 客户端上下文：读改绑后的键位。
  * @returns 卡片组件。
  */
-export function makeShortcutsCard(rt: SettingsRuntime, ctx: ShortcutHost): FunctionComponent {
+export function makeShortcutsCard(rt: SettingsRuntime, ctx: ShortcutHost): FunctionComponent<ShortcutsCardProps> {
   const { h, t, useState, useEffect } = rt;
   const { foldCard } = makeUiKit({ h, t });
 
-  return function ShortcutsCard() {
+  return function ShortcutsCard({ chatHotkey }: ShortcutsCardProps) {
     const [open, setOpen] = useState(false);
     // 每次渲染现读一遍：目录只是几十行数组，读它比维护一份缓存更省事。
     const [keycaps, setKeycaps] = useState<GlobalKeycaps>(readKeycaps(ctx));
@@ -86,7 +92,7 @@ export function makeShortcutsCard(rt: SettingsRuntime, ctx: ShortcutHost): Funct
           key: 'petRows',
           className: 'dsh-pet-cfg__grid2',
           children: [
-            row('shortcutRowChat', CHAT_HOTKEY_HINT),
+            row('shortcutRowChat', chatHotkeyHint(chatHotkey)),
             row('shortcutRowHold', HEAR_HOTKEY_HINT),
             row('shortcutRowCapture', CAPTURE_HOTKEY_HINT),
             row('shortcutRowPaste', PASTE_KEYCAP),

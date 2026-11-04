@@ -168,6 +168,8 @@ export function makePetConfigSection(
     const [chatMemory, setChatMemory] = useState(10);
     // 对话配图张数上限（全局默认）：初值 20 是内置默认，加载后由成品值覆盖。
     const [chatImageLimit, setChatImageLimit] = useState(20);
+    // 悬停打开对话的按键：只读展示用（在 main-config.jsonc 的 hotkeys.chat 里改）。
+    const [chatHotkey, setChatHotkey] = useState('l');
     // 头像预览的破缓存版本号：上传成功后换一个，预览才会重新取图（同一 URL 会被浏览器记住）。
     const [avatarVersion, setAvatarVersion] = useState(Date.now());
     // 头像上传中：按钮禁用并换文案，与「保存」的 busy 分开——上传不写配置。
@@ -199,6 +201,7 @@ export function makePetConfigSection(
         if (patch.chatModel !== undefined) setChatModel(patch.chatModel);
         if (patch.chatMemoryRounds !== undefined) setChatMemory(patch.chatMemoryRounds);
         if (patch.chatImageLimit !== undefined) setChatImageLimit(patch.chatImageLimit);
+        if (patch.hotkeys?.chat !== undefined) setChatHotkey(patch.hotkeys.chat);
       },
       [replace],
     );
@@ -420,7 +423,7 @@ export function makePetConfigSection(
         }),
 
         // 保存按钮以下是参考类卡片：只读说明，改不改都不用点保存。
-        h(ShortcutsCard, {}),
+        h(ShortcutsCard, { chatHotkey }),
 
         // 落盘位置两张卡都靠 meta，读不到就整块不出现。
         paths ? h(ConfigMetaCard, { paths }) : null,

@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import type { jsx } from 'react/jsx-runtime';
 
 import { HEAR_HOTKEY_HINT } from '../../shared/chat/hear-hold.ts';
-import { CAPTURE_HOTKEY_HINT, CHAT_HOTKEY_HINT } from '../../shared/chat/hotkey.ts';
+import { CAPTURE_HOTKEY_HINT, chatHotkeyHint } from '../../shared/chat/hotkey.ts';
 import { SLEEP_HOTKEY_HINT } from '../../shared/sleep-hotkey.ts';
 import { TODO_HOTKEY_HINT } from '../../shared/todo/hotkey.ts';
 import { keycapOf, type ShortcutHost } from '../app-shortcut.ts';
@@ -85,9 +85,9 @@ function nodes(node: unknown): Node[] {
 }
 
 /** 按给定目录渲染一次整张卡。 */
-function render(rows: Row[] = []): unknown {
+function render(rows: Row[] = [], props: { chatHotkey?: unknown } = {}): unknown {
   const Card = makeShortcutsCard({ h, t: (key: string) => key, useState, useEffect } as never, makeCtx(rows));
-  return Card({});
+  return Card(props);
 }
 
 describe('ShortcutsCard —— 快捷键卡', () => {
@@ -109,11 +109,16 @@ describe('ShortcutsCard —— 快捷键卡', () => {
 
   test('悬停那组读共享常量，且不受改绑影响', () => {
     const text = texts(render(REBOUND)).join('\n');
-    assert.ok(text.includes(CHAT_HOTKEY_HINT), '打开对话');
+    assert.ok(text.includes(chatHotkeyHint('l')), '打开对话');
     assert.ok(text.includes(HEAR_HOTKEY_HINT), '按住说话');
     assert.ok(text.includes(CAPTURE_HOTKEY_HINT), '截图');
     assert.ok(text.includes(TODO_HOTKEY_HINT), '待办');
     assert.ok(text.includes(SLEEP_HOTKEY_HINT), '睡觉');
+  });
+
+  test('对话键来自配置：改了 hotkeys.chat，卡片跟着显示新键', () => {
+    const text = texts(render(REBOUND, { chatHotkey: 't' })).join('\n');
+    assert.ok(text.includes(chatHotkeyHint('t')), '按配置的键显示');
   });
 
   test('两组标题与说明、以及全部行标签都在', () => {

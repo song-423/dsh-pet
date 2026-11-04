@@ -7,6 +7,7 @@
  * @module dsh-pet/src/host/routes/types
  */
 import type { ChatMemoryMessage } from '../chat.ts';
+import type { ChatFacts } from '../plugin/chat-facts.ts';
 import type { ConfigPaths } from '../config.ts';
 import type { RouteResult } from '../http.ts';
 import type { PetImageRef } from '../image-attachment.ts';
@@ -154,6 +155,8 @@ export interface PetRouteDeps {
   readonly orphanHistory: () => Promise<{ entry: string; petId: string; messages: number; lastTs: number }[]>;
   /** 清掉所有已删宠物的历史。 */
   readonly deleteOrphans: () => Promise<{ ok: true; pets: number; messages: number }>;
+  /** 长期事实记忆（与 chatWithPet 共用同一实例，别在这里再 new 一份）。 */
+  readonly facts: ChatFacts;
   /** 用户动画目录（按扩展名）。 */
   readonly userRootFor: (ext: string) => string;
   /** 包内动画目录（按扩展名）。 */

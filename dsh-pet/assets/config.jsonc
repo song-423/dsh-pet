@@ -8,7 +8,9 @@
 //   · 全局默认（本文件是默认值；用户在 main-config.jsonc 里写一次就对**所有宠物**生效，
 //     含 pet/<名>-config.json 定义的种类；种类文件自己写了则覆盖自己那份）：
 //     physics / font / confineToScreen / whisperImageEnabled / chatImageEnabled / chatAnimationEnabled /
-//     chatMemoryRounds / whisperModel / chatModel / eventsRefreshSec
+//     chatMemoryRounds / whisperModel / chatModel / eventsRefreshSec /
+//     factsEnabled / factsMax / factsInjectMax / factsExtractEnabled / hotkeys /
+//     proactiveEnabled / proactiveIdleMin / proactivePerHour / proactiveQuietHours
 //   · 条目级（每个条目一份：main 一份、每个种类各一份；种类文件顶层可覆盖）：
 //     whisperPrompt / memes / workStatusTexts / animations / animationWeights
 //   · 只读 main（写了也只认 main 条目那份）：notificationsEnabled / eventsRefreshSec.balance
@@ -80,6 +82,38 @@
   // 非负整数；**内置默认 20**（27 张的池子只砍掉 7 张，仍能压住每条消息的图 token）；0 = 不限制（全部发）。
   // 只影响对话选图：碎碎念只带抽中的那一张，与本项无关。
   "chatImageLimit": 20,
+  // ===================== 长期记忆：事实记忆（全局默认；种类文件 top 层可覆盖） =====================
+  // memory.json 记的是**对话原文**，按 chatMemoryRounds 轮截取，聊得久了早先的话就滑出窗口。
+  // 事实记忆是另一份文件（$DSH_HOME/dsh-pet/memory-facts.json）：它存的是从对话里提炼出的
+  // 「关于主人的稳定事实」——称呼、喜好、习惯、身份、约定，几十字一条，长期有效、几乎不占 token。
+  // 注入方式：每次生成（碎碎念 / 睡觉梦话 / 对话 / 主动搭话）都把最常用的几条拼进 system 提示词。
+  "factsEnabled": true,
+  // 事实总量上限（全局默认）：超过就按「最久没用过的」淘汰，防止越攒越多把上下文顶爆。
+  // 正整数；缺省 60。
+  "factsMax": 60,
+  // 每次注入几条（全局默认）：按使用时间排序取最近的 N 条。正整数；缺省 25。
+  // 调大 = 记得更全但每轮都多花 token，调小 = 省钱但可能想不起早先的事。
+  "factsInjectMax": 25,
+  // 是否在面板对话后自动提炼新事实（全局默认）。关掉后就只剩手动添加（记忆面板 / remember 命令）。
+  // 自动提炼是**异步、失败静默**的：它不拖慢回复，失败也不影响对话。
+  "factsExtractEnabled": true,
+  // ===================== 悬停快捷键（全局默认；种类文件顶层可覆盖） =====================
+  // 鼠标停在宠物上时按哪个键打开对话输入框。单个字母或数字（大小写不敏感），缺省 l。
+  // 只影响「悬停裸键」这一种入口；应用级组合键（Ctrl/Cmd+Shift+P 开侧栏对话等）
+  // 由 DSH 的快捷键服务分发，在「设置 → 快捷键」里改，不在这里配。
+  "hotkeys": { "chat": "l" },
+  // ===================== 主动搭话（全局默认；种类文件顶层可覆盖） =====================
+  // 与碎碎念的区别：碎碎念是随机一句闲话，主动搭话会**读最近几轮对话与事实记忆**，
+  // 所以它能接上之前的话头（「刚才说的那个…」）。默认关闭——它比碎碎念更像"被打扰"。
+  "proactiveEnabled": false,
+  // 安静多久之后才可以主动开口（分钟，正整数）。缺省 45。
+  // 「安静」= 你最后一次**发消息**到现在，不是最后一次动鼠标。
+  "proactiveIdleMin": 45,
+  // 每小时最多主动开口几次（正整数）。缺省 2。两次之间至少隔 3600 / 本值 秒。
+  "proactivePerHour": 2,
+  // 安静时段：这段时间内一律不主动开口，格式 "开始-结束"（24 小时制，可跨午夜）。
+  // 缺省 "23:00-08:00"。留空字符串 = 不设安静时段。
+  "proactiveQuietHours": "23:00-08:00",
   // ===================== 语音播报（全局默认；种类文件 pet/<名>-config.json 顶层可覆盖） =====================
   // 碎碎念与对话回复是否用语音念出来。默认关闭——不是所有人都希望桌宠出声。
   // 只影响「说不说」：气泡、记忆与通知都不受影响。
