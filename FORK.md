@@ -1,6 +1,6 @@
 # 这份 fork 改了什么
 
-上游：[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)。本仓库是它的**自用魔改分支**，
+上游：[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)。本仓库是它的**自用二创分支**，
 基线是上游 `v0.4.1`（tag 仍在），改动全部落在 `main` 上。
 
 ## 新增能力
