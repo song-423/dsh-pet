@@ -54,6 +54,9 @@
               edit: false
           - id: tool-fs-search
             name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              # 必填（z.boolean().required()）：漏了会让整个「桌宠」预设加载失败
+              sampleOverCapGlobResults: false
           - id: compaction
             name: cordis:group
             group: true
