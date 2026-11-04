@@ -57,6 +57,9 @@ function makeHost(mode: 'ok' | 'missing' | 'reject') {
 /** 被测命令：键位随便给，断言只关心它被原样铺开。 */
 const BINDING = { code: 'KeyL', modifiers: ['primary', 'shift'] } as const;
 
+/** 另一个键位：用来验证 `profiles` 只覆盖写了的档位。 */
+const WEBISH = { code: 'KeyP', modifiers: ['primary', 'shift'] } as const;
+
 describe('keycapOf —— 键帽推导', () => {
   /** 与实现同一套判据；测试只关心「推导规则」而不是具体平台。 */
   const primary = /Mac/i.test(navigator.platform || navigator.userAgent) ? 'Cmd' : 'Ctrl';
@@ -86,6 +89,22 @@ describe('registerAppShortcut —— 快捷键注册壳', () => {
       assert.deepEqual(state.command?.defaults[profile], BINDING, profile);
     }
     assert.equal(state.command?.defaults['web:linux'], undefined, 'web:linux 进白名单会整条被拒');
+  });
+
+  test('profiles 覆盖单个档位：没写的档位仍用 binding', () => {
+    const { host, state } = makeHost('ok');
+    const desktop = { code: 'KeyL', modifiers: ['primary'] } as const;
+    registerAppShortcut(host, {
+      id: 'x.y',
+      label: () => 'L',
+      binding: WEBISH,
+      profiles: { 'desktop:windows': desktop, 'desktop:macos': desktop },
+      run: () => {},
+    });
+    assert.deepEqual(state.command?.defaults['desktop:windows'], desktop);
+    assert.deepEqual(state.command?.defaults['desktop:macos'], desktop);
+    assert.deepEqual(state.command?.defaults['desktop:linux'], WEBISH, '没写覆盖的档位沿用 binding');
+    assert.deepEqual(state.command?.defaults['web:windows'], WEBISH);
   });
 
   test('同时认 page 与 editable：弹窗开了焦点在输入框里也必须收得到', () => {

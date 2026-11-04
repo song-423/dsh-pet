@@ -43,7 +43,7 @@ function makeHost(hasService: boolean) {
 }
 
 describe('registerPetChatShortcut —— 打开对话的快捷键', () => {
-  test('服务可用 → 用固定 id 注册，默认 Ctrl+Shift+P（primary 在 macOS 展开为 Command）', () => {
+  test('服务可用 → 用固定 id 注册，桌面默认 Ctrl+L、Web 留在白名单里的 Ctrl+Shift+P', () => {
     const host = makeHost(true);
     const result = registerPetChatShortcut(
       host.ctx,
@@ -52,8 +52,10 @@ describe('registerPetChatShortcut —— 打开对话的快捷键', () => {
     );
     assert.equal(result.registered, true);
     assert.equal(host.state.command?.id, PET_CHAT_COMMAND_ID);
+    assert.deepEqual(host.state.command?.defaults['desktop:windows'], { code: 'KeyL', modifiers: ['primary'] });
+    assert.deepEqual(host.state.command?.defaults['desktop:macos'], { code: 'KeyL', modifiers: ['primary'] });
     assert.deepEqual(host.state.command?.defaults['web:windows'], { code: 'KeyP', modifiers: ['primary', 'shift'] });
-    assert.deepEqual(host.state.command?.defaults['desktop:macos'], { code: 'KeyP', modifiers: ['primary', 'shift'] });
+    assert.deepEqual(host.state.command?.defaults['web:macos'], { code: 'KeyP', modifiers: ['primary', 'shift'] });
   });
 
   test('触发命令 → 调用传入的打开动作', () => {
@@ -139,7 +141,7 @@ describe('petChatShortcutKeycap —— 侧栏对话的键帽', () => {
   });
 
   test('目录里没有这一条 / 服务缺失 → 退回默认组合', () => {
-    const expected = keycapOf({ code: 'KeyP', modifiers: ['primary', 'shift'] });
+    const expected = keycapOf({ code: 'KeyL', modifiers: ['primary'] });
     assert.equal(petChatShortcutKeycap({ get: () => ({ catalog: { getSnapshot: () => [] } }) }), expected);
     assert.equal(petChatShortcutKeycap({ get: () => undefined }), expected);
   });

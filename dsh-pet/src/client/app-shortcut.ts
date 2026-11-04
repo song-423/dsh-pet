@@ -3,7 +3,8 @@
  *
  * DSH 的快捷键服务在旧宿主上可能不存在，注册也可能被拒（键位不合 Web 白名单、id 或键位冲突），
  * 两种情况都只让这一条命令消失，绝不拖垮插件加载。
- * 键位一律「一条命令一个键」：不按桌面/网页给不同默认值，要换去设置里换。
+ * 键位默认「一条命令一个键」；确实需要按桌面/网页分开时，才在 `profiles` 里逐档覆盖
+ * （Web 端有白名单，桌面能用的组合网页里未必能用）。
  * 同一个服务还提供「当前生效键帽」的读面：用户改绑后，展示必须跟着变，不能再念默认值。
  * @module dsh-pet/src/client/app-shortcut
  */
@@ -95,7 +96,18 @@ export interface AppShortcut {
   readonly id: string;
   /** 设置页里显示的标题；惰性求值，切语言后会重算。 */
   readonly label: () => string;
+  /** 默认键位；`profiles` 里单独写了的档位优先于它。 */
   readonly binding: ShortcutBinding;
+  /**
+   * 按环境档案覆盖默认键位（可选）。
+   *
+   * 为什么需要它：服务在 `register` 时会把**所有**声明过的档位都校验一遍，
+   * 只要有一个 Web 档位不合法（`Unsupported Web shortcut`）或撞了系统保留键
+   * （`Reserved shortcut default`），整条命令就注册失败、桌面上也跟着消失。
+   * 所以桌面想用「主键 + 字母」这种网页里被占用的组合时，只能只改桌面档位，
+   * Web 档位继续留在白名单里。
+   */
+  readonly profiles?: Partial<Record<(typeof SHORTCUT_PROFILES)[number], ShortcutBinding>>;
   /** 触发时执行的动作。 */
   readonly run: () => void;
 }
@@ -118,7 +130,9 @@ export function registerAppShortcut(
     return { registered: false, dispose: () => {} };
   }
   try {
-    const defaults = Object.fromEntries(SHORTCUT_PROFILES.map((profile) => [profile, shortcut.binding]));
+    const defaults = Object.fromEntries(
+      SHORTCUT_PROFILES.map((profile) => [profile, shortcut.profiles?.[profile] ?? shortcut.binding]),
+    );
     const dispose = shortcuts.register({
       id: shortcut.id,
       label: shortcut.label,

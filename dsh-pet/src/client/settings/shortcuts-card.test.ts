@@ -53,7 +53,7 @@ const REBOUND: Row[] = [
 ];
 
 /** 默认组合：目录里没有这一行时的兜底文案。 */
-const CHAT_DEFAULT = keycapOf({ code: 'KeyP', modifiers: ['primary', 'shift'] });
+const CHAT_DEFAULT = keycapOf({ code: 'KeyL', modifiers: ['primary'] });
 const FLOAT_DEFAULT = keycapOf({ code: 'KeyL', modifiers: ['primary', 'shift'] });
 const HEAR_DEFAULT = keycapOf({ code: 'KeyM', modifiers: ['primary', 'shift'] });
 const CAPTURE_DEFAULT = keycapOf({ code: 'KeyS', modifiers: ['primary', 'shift'] });

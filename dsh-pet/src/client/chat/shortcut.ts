@@ -10,17 +10,40 @@ import { keycapOf, readShortcutKeycap, registerAppShortcut, type ShortcutHost } 
 /** 命令 id：guide 卡片的 `commandId` 与注册都用它。 */
 export const PET_CHAT_COMMAND_ID = 'pet-chat.open';
 
-/** 主修饰键 + Shift + P；Web 白名单允许「主键 + Shift/Alt + 字母」，所以两端同一个键。 */
-const BINDING = { code: 'KeyP', modifiers: ['primary', 'shift'] } as const;
+/**
+ * 桌面端的默认键位：主修饰键 + L（Windows/Linux 上是 Ctrl+L，macOS 是 Cmd+L）。
+ *
+ * 选单个字母是为了「不用先把鼠标放到桌宠身上」——桌宠卡片上的悬停键只在指针落上去时生效，
+ * 而这条是应用级命令，焦点在 DSH 任何位置都能按。
+ */
+export const DESKTOP_BINDING = { code: 'KeyL', modifiers: ['primary'] } as const;
+
+/**
+ * Web 端的默认键位：主修饰键 + Shift + P。
+ *
+ * 网页里 Ctrl+L 是浏览器地址栏的保留组合，DSH 的 Web 白名单只放行
+ * 「主键 + Shift/Alt + 字母」，写成 Ctrl+L 会让 `register` 直接抛
+ * `Unsupported Web shortcut`，连桌面端的这条命令一起没掉。
+ */
+export const WEB_BINDING = { code: 'KeyP', modifiers: ['primary', 'shift'] } as const;
+
+/** 逐档默认键位：桌面三档用 Ctrl+L，Web 两档留在白名单里。 */
+const PROFILES = {
+  'desktop:macos': DESKTOP_BINDING,
+  'desktop:windows': DESKTOP_BINDING,
+  'desktop:linux': DESKTOP_BINDING,
+  'web:macos': WEB_BINDING,
+  'web:windows': WEB_BINDING,
+} as const;
 
 /**
  * 设置页显示的键帽：跟着用户改绑走。
  *
  * @param ctx - 客户端上下文。
- * @returns 键帽文案；还没登记、或宿主没有快捷键服务时退回默认组合。
+ * @returns 键帽文案；还没登记、或宿主没有快捷键服务时退回桌面默认组合。
  */
 export function petChatShortcutKeycap(ctx: ShortcutHost): string {
-  return readShortcutKeycap(ctx, PET_CHAT_COMMAND_ID) ?? keycapOf(BINDING);
+  return readShortcutKeycap(ctx, PET_CHAT_COMMAND_ID) ?? keycapOf(DESKTOP_BINDING);
 }
 
 /**
@@ -37,5 +60,11 @@ export function registerPetChatShortcut(
   label: () => string,
   open: () => void,
 ): { registered: boolean; dispose: () => void } {
-  return registerAppShortcut(ctx, { id: PET_CHAT_COMMAND_ID, label, binding: BINDING, run: open });
+  return registerAppShortcut(ctx, {
+    id: PET_CHAT_COMMAND_ID,
+    label,
+    binding: DESKTOP_BINDING,
+    profiles: PROFILES,
+    run: open,
+  });
 }
